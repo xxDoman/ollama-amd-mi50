@@ -1,5 +1,7 @@
 # Ollama + ROCm 7.1 dla AMD MI50 (gfx906)
 
+https://hub.docker.com/r/xxdoman/ollama-amd-rocm71
+
 Pojedynczy obraz Docker do uruchomienia **Ollama 0.12.3 z ROCm 7.1** na **AMD Instinct MI50 (gfx906)**.
 
 * Host OS: Ubuntu 22.04 / 24.04 z działającym ROCm
