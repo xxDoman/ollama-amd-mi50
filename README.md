@@ -1,338 +1,226 @@
-EN VERSION
-Ollama + ROCm 7.1 for AMD MI50 (gfx906) – Docker image
-This Docker image bundles:
+================= README (TXT) =================
 
-Ubuntu 24.04 (minimal rootfs)
-AMD ROCm 7.1 userspace (rocm, hip, no DKMS / kernel modules inside the container)
-Ollama 0.12.3 with the ROCm backend
-Environment tuned and tested for AMD Instinct MI50 (gfx906)
-The goal is to run Ollama inside Docker with full ROCm support on MI50, so that inference runs on the GPU instead of the CPU.
+Ollama + ROCm 7.1 for AMD MI50 (gfx906)
 
-What’s inside
-Base image: ubuntu:24.04
-ROCm 7.1 userspace installed from the official AMD installer:
-amdgpu-install_7.1.70100-1_all.deb
-using:
-bash
-Copy
-amdgpu-install --usecase=rocm,hip --no-dkms -y
-Ollama 0.12.3 installed via the official script, with:
-OLLAMA_LLM_LIBRARY=rocm
-OLLAMA_HOST=0.0.0.0:11434
-Important:
-This image does not ship AMD kernel drivers. It relies on the host kernel + drivers and just mounts the GPU devices into the container.
+Jedno Docker image do uruchomienia Ollama 0.12.3 z ROCm 7.1 na AMD Instinct MI50 (gfx906).
 
+Host: Ubuntu 22.04 / 24.04 z działającym ROCm
+GPU: AMD Instinct MI50 (gfx906)
+Cel: inferencja na GPU (ROCm), a nie na CPU
+
+Obraz nie zawiera sterowników kernela – używa kernela i sterowników z hosta przez urządzenia /dev/kfd oraz /dev/dri/renderD*.
+
+ENGLISH
+What this image includes
+Ubuntu 24.04 (minimal)
+AMD ROCm 7.1 userspace (ROCm + HIP, bez kernel modules w kontenerze)
+Ollama 0.12.3 with ROCm backend
+Configuration tested on AMD Instinct MI50 (gfx906)
 Host requirements
-Linux host (tested on Ubuntu 24.04, should also work on 22.04)
-A ROCm‑supported AMD GPU, tested on:
+You need:
+
+Ubuntu 22.04 or 24.04
+ROCm 7.1 properly installed on the host
 AMD Instinct MI50 (gfx906)
-Working ROCm installation on the host:
-amdgpu kernel module loaded
-/dev/kfd present
-/dev/dri/renderD* devices present (e.g. renderD128, renderD129)
-Your user in the video group (for GPU device access)
-The container uses the host kernel and drivers via:
+Your user in the "video" group
+Quick checks on the host:
 
---device=/dev/kfd
---device=/dev/dri/renderD*
-Quick build (from source)
-If you want to build locally:
+ls -l /dev/kfd
+ls -l /dev/dri/renderD*
+groups
 
-bash
-Copy
+If ROCm is broken on the host, the container will also fall back to CPU.
+
+Build image locally (optional)
+If you want to build the image yourself:
+
 git clone https://github.com/xxDoman/ollama-amd-mi50.git
 cd ollama-amd-mi50
 docker build -t ollama-amd-rocm71 .
-Otherwise you can simply pull from Docker Hub:
 
-bash
-Copy
+Or pull from Docker Hub:
+
 docker pull xxdoman/ollama-amd-rocm71:latest
-Running the container
-Basic run (no persistent volume):
 
-bash
-Copy
+Run the container
+Basic run (no persistent models):
+
 docker run -d \
-  --name ollama-amd-rocm71 \
-  --device=/dev/kfd \
-  --device=/dev/dri/renderD128 \
-  --device=/dev/dri/renderD129 \
-  --group-add video \
-  -p 11434:11434 \
-  xxdoman/ollama-amd-rocm71 \
-  ollama serve
-If you want persistent models (recommended):
+--name ollama-amd-rocm71 \
+--device=/dev/kfd \
+--device=/dev/dri/renderD128 \
+--device=/dev/dri/renderD129 \
+--group-add video \
+-p 11434:11434 \
+xxdoman/ollama-amd-rocm71 \
+ollama serve
 
-bash
-Copy
+Recommended run with persistent model location on host:
+
 mkdir -p /opt/ollama-models
 
 docker run -d \
-  --name ollama-amd-rocm71 \
-  --device=/dev/kfd \
-  --device=/dev/dri/renderD128 \
-  --device=/dev/dri/renderD129 \
-  --group-add video \
-  -p 11434:11434 \
-  -v /opt/ollama-models:/root/.ollama \
-  xxdoman/ollama-amd-rocm71 \
-  ollama serve
-Checking logs
-bash
-Copy
-docker logs -n 80 ollama-amd-rocm71
-You should see lines like:
+--name ollama-amd-rocm71 \
+--device=/dev/kfd \
+--device=/dev/dri/renderD128 \
+--device=/dev/dri/renderD129 \
+--group-add video \
+-p 11434:11434 \
+-v /opt/ollama-models:/root/.ollama \
+xxdoman/ollama-amd-rocm71 \
+ollama serve
 
-text
-Copy
+Ollama will be available at:
+http://localhost:11434
+
+Check logs and ROCm detection
+docker logs -n 80 ollama-amd-rocm71
+
+Look for lines similar to:
+
 amdgpu is supported gpu_type=gfx906
 inference compute id=GPU-... library=rocm compute=gfx906 total="32.0 GiB"
 Listening on [::]:11434 (version 0.12.3)
-Key fields:
 
-amdgpu is supported
-library=rocm
-compute=gfx906
-This means Ollama is using the ROCm backend on MI50, not CPU.
+This means:
 
-If instead you see something like:
+GPU detected
+library = rocm
+compute = gfx906 (MI50)
+If you see:
 
-text
-Copy
 no suitable rocm found, falling back to CPU
 inference compute ... library=cpu
-then the GPU backend is not active – check:
 
-ROCm installation on the host,
-devices passed via --device=/dev/kfd and --device=/dev/dri/renderD*.
-Testing with a model
-Inside the container:
+then the container is running on CPU, not GPU. Check:
 
-bash
-Copy
+ROCm installation on host
+devices passed: /dev/kfd and /dev/dri/renderD*
+Test with a model
+Enter the container:
+
 docker exec -it ollama-amd-rocm71 /bin/bash
+
+Pull a model:
+
 ollama pull llama3.2:1b
+
+List models:
+
 ollama list
+
+Simple test:
+
 ollama run llama3.2:1b
-From the host (HTTP API test):
 
-bash
-Copy
+HTTP API test from host:
+
 curl http://localhost:11434/api/tags
-and:
 
-bash
-Copy
 curl -X POST http://localhost:11434/api/generate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "llama3.2:1b",
-    "prompt": "Hello from MI50!",
-    "stream": false
-  }'
-Example response (shortened):
+-H "Content-Type: application/json" \
+-d '{
+"model": "llama3.2:1b",
+"prompt": "Hello from MI50!",
+"stream": false
+}'
 
-json
-Copy
-{
-  "model": "llama3.2:1b",
-  "response": "Welcome to the world of cricket. I'm happy to chat with you...",
-  "done": true
-}
-While the model is generating, on the host run:
+While generating, check GPU usage on host:
 
-bash
-Copy
 /opt/rocm/bin/rocm-smi
-If MI50 VRAM usage and GPU activity go up, inference is running on the GPU.
 
-Why not just use the official ollama/ollama image?
-The official ollama/ollama image:
+If MI50 VRAM and activity go up, inference is running on GPU.
 
-ships with CPU / CUDA support,
-does not include ROCm userspace libraries.
-On AMD MI50 it typically prints:
+Why not use the official ollama/ollama image?
+The official "ollama/ollama" image:
 
-text
-Copy
+has CPU and CUDA support
+does not contain ROCm userspace
+On MI50 this usually results in:
+
 no compatible rocm library found ... falling back to CPU
-This Dockerfile:
 
-adds ROCm 7.1 userspace inside the container,
-sets OLLAMA_LLM_LIBRARY=rocm,
-is tested specifically on gfx906 (MI50).
-Known limitations
-Designed and tested for:
-AMD MI50 (gfx906) + ROCm 7.1 on the host.
-May work on other Vega 20 / gfx906 cards, but not guaranteed.
-Host must have a working ROCm installation and expose:
-/dev/kfd
-/dev/dri/renderD*
-The image is large (~30.7 GB) – this is a conscious trade‑off for a full ROCm userspace + Ollama bundle: “30 GB of AMD happiness”.
-PL VERSION
-Ollama + ROCm 7.1 dla AMD MI50 (gfx906) – obraz Dockera
-Ten obraz Dockera zawiera:
+This image:
 
-Ubuntu 24.04 (minimalny system)
-AMD ROCm 7.1 w przestrzeni użytkownika (rocm, hip, bez modułów kernela / DKMS wewnątrz kontenera)
-Ollama 0.12.3 z backendem ROCm
-Konfigurację środowiska pod kartę AMD MI50 (gfx906)
-Celem jest uruchomienie Ollamy w Dockerze z pełnym wsparciem ROCm na MI50, tak aby inferencja szła po GPU, a nie po CPU.
+adds full ROCm 7.1 userspace inside the container
+configures Ollama to use ROCm (library=rocm)
+is tested specifically on AMD Instinct MI50 (gfx906)
+Limitations
+Designed and tested for AMD MI50 (gfx906) + ROCm 7.1
+May work on other gfx906 / Vega 20 cards, but not guaranteed
+Requires working ROCm installation on the host
+Image is large (~30.7 GB): full ROCm + Ollama in one container, to "just work"
+POLSKI OPIS (skrót)
+Ten sam obraz, opisany po polsku.
 
-Co jest w środku
-Obraz bazowy: ubuntu:24.04
-Userspace ROCm 7.1 z oficjalnego instalatora AMD:
-amdgpu-install_7.1.70100-1_all.deb
-instalowany poleceniem:
-bash
-Copy
-amdgpu-install --usecase=rocm,hip --no-dkms -y
-Ollama 0.12.3 zainstalowana oficjalnym skryptem, z:
-OLLAMA_LLM_LIBRARY=rocm
-OLLAMA_HOST=0.0.0.0:11434
-Uwaga:
-Obraz nie zawiera sterowników kernela. Korzysta z kernela i sterowników z hosta, a GPU jest podawane przez --device=/dev/kfd oraz /dev/dri/renderD*.
+Co zawiera:
 
-Wymagania po stronie hosta
-Linux, testowane na Ubuntu 24.04 (powinno działać też na 22.04)
-GPU AMD wspierane przez ROCm 7.1, testowane na:
-AMD Instinct MI50 (gfx906)
-Działający ROCm na hoście:
-załadowany moduł amdgpu
-obecne /dev/kfd
-obecne /dev/dri/renderD* (np. renderD128, renderD129)
-Użytkownik w grupie video (dostęp do urządzeń GPU)
-Kontener korzysta z kernela/sterowników hosta poprzez:
+Ubuntu 24.04
+ROCm 7.1 userspace
+Ollama 0.12.3 (backend ROCm)
+GPU: AMD Instinct MI50 (gfx906)
+Wymagania hosta:
 
---device=/dev/kfd
---device=/dev/dri/renderD*
-Budowanie lokalnie
-Jeśli chcesz zbudować obraz samodzielnie:
+Ubuntu 22.04 lub 24.04
+zainstalowany i działający ROCm 7.1
+urządzenia /dev/kfd i /dev/dri/renderD*
+użytkownik w grupie "video"
+Szybkie sprawdzenie:
 
-bash
-Copy
+ls -l /dev/kfd
+ls -l /dev/dri/renderD*
+groups
+
+Budowanie obrazu lokalnie (opcjonalnie):
+
 git clone https://github.com/xxDoman/ollama-amd-mi50.git
 cd ollama-amd-mi50
 docker build -t ollama-amd-rocm71 .
-Albo po prostu pobierz z Docker Huba:
 
-bash
-Copy
+Albo pobranie z Docker Huba:
+
 docker pull xxdoman/ollama-amd-rocm71:latest
-Uruchamianie kontenera
-Prosta wersja (bez trwałych modeli):
 
-bash
-Copy
-docker run -d \
-  --name ollama-amd-rocm71 \
-  --device=/dev/kfd \
-  --device=/dev/dri/renderD128 \
-  --device=/dev/dri/renderD129 \
-  --group-add video \
-  -p 11434:11434 \
-  xxdoman/ollama-amd-rocm71 \
-  ollama serve
-Wersja z trwałymi modelami (volume):
+Uruchomienie z trwałą lokalizacją modeli:
 
-bash
-Copy
 mkdir -p /opt/ollama-models
 
 docker run -d \
-  --name ollama-amd-rocm71 \
-  --device=/dev/kfd \
-  --device=/dev/dri/renderD128 \
-  --device=/dev/dri/renderD129 \
-  --group-add video \
-  -p 11434:11434 \
-  -v /opt/ollama-models:/root/.ollama \
-  xxdoman/ollama-amd-rocm71 \
-  ollama serve
-Sprawdzenie logów
-bash
-Copy
+--name ollama-amd-rocm71 \
+--device=/dev/kfd \
+--device=/dev/dri/renderD128 \
+--device=/dev/dri/renderD129 \
+--group-add video \
+-p 11434:11434 \
+-v /opt/ollama-models:/root/.ollama \
+xxdoman/ollama-amd-rocm71 \
+ollama serve
+
+Ollama będzie dostępna pod adresem:
+http://localhost:11434
+
+Sprawdzenie logów:
+
 docker logs -n 80 ollama-amd-rocm71
-Jeśli wszystko działa, zobaczysz m.in.:
 
-text
-Copy
+Szukaj m.in.:
+
 amdgpu is supported gpu_type=gfx906
-inference compute id=GPU-... library=rocm compute=gfx906 total="32.0 GiB"
-Listening on [::]:11434 (version 0.12.3)
-Kluczowe fragmenty:
+library=rocm compute=gfx906
 
-amdgpu is supported
-library=rocm
-compute=gfx906
-To znaczy, że Ollama korzysta z backendu ROCm na MI50, a nie z CPU.
+Jeżeli jest library=cpu lub komunikat o braku ROCm, to znaczy że liczy na CPU.
 
-Jeśli pojawi się:
+Test modelu:
 
-text
-Copy
-no suitable rocm found, falling back to CPU
-inference compute ... library=cpu
-to GPU nie jest używane – trzeba sprawdzić:
-
-instalację ROCm na hoście,
-przekazywane urządzenia --device=/dev/kfd i /dev/dri/renderD*.
-Test modelu
-W kontenerze:
-
-bash
-Copy
 docker exec -it ollama-amd-rocm71 /bin/bash
 ollama pull llama3.2:1b
-ollama list
 ollama run llama3.2:1b
-Z hosta (przez HTTP API):
 
-bash
-Copy
+API z hosta:
+
 curl http://localhost:11434/api/tags
-oraz:
+curl -X POST http://localhost:11434/api/generate ...
 
-bash
-Copy
-curl -X POST http://localhost:11434/api/generate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "llama3.2:1b",
-    "prompt": "Hello from MI50!",
-    "stream": false
-  }'
-Jeśli w odpowiedzi dostaniesz tekst – wszystko działa.
+GPU monitorujesz:
 
-Podczas generacji, na hoście możesz sprawdzić:
-
-bash
-Copy
 /opt/rocm/bin/rocm-smi
-Jeżeli rośnie zużycie VRAM i aktywność MI50 – model liczy się na GPU.
-
-Dlaczego nie używać domyślnego obrazu ollama/ollama?
-Oficjalny obraz ollama/ollama:
-
-ma wsparcie CPU / CUDA,
-nie zawiera w środku userspace ROCm.
-Na MI50 kończy się to komunikatem:
-
-text
-Copy
-no compatible rocm library found ... falling back to CPU
-Ten Dockerfile:
-
-dodaje ROCm 7.1 userspace wewnątrz kontenera,
-ustawia Ollamę tak, aby używała library=rocm na gfx906,
-jest przetestowany na AMD MI50 (gfx906).
-Ograniczenia
-Projekt przygotowany i testowany dla:
-AMD MI50 (gfx906) + ROCm 7.1 na hoście.
-Może działać na innych kartach Vega 20 / gfx906, ale nie ma gwarancji.
-Host musi mieć działający ROCm i udostępniać:
-/dev/kfd
-/dev/dri/renderD*
-Obraz jest duży (~30,7 GB) – to świadomy „overkill”: pełny ROCm 7.1 + Ollama w jednym kontenerze, żeby po prostu działało na MI50.
-Jeśli chcesz, mogę też dopasować ten README pod dokładną strukturę Twojego repo (np. sekcja „Tags”, „Changelog”, link do Docker Huba itd.).
