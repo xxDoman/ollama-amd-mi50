@@ -41,11 +41,11 @@ You need:
 
 **Quick checks on the host:**
 
-bash  
+```bash  
 ls -l /dev/kfd  
 ls -l /dev/dri/renderD*  
 groups  
-
+```
 > If ROCm is broken on the host, the container will also fall back to CPU.
 
 -------------------------------------------
@@ -53,22 +53,22 @@ groups
 
 If you want to build the image yourself instead of pulling from Docker Hub:
 
-bash  
+```bash  
 git clone https://github.com/xxDoman/ollama-amd-mi50.git  
 cd ollama-amd-mi50  
 docker build -t ollama-amd-rocm71 .  
-
+```
 Or pull directly:
 
-bash  
+```bash  
 docker pull xxdoman/ollama-amd-rocm71:latest  
-
+```
 -------------------------------------------
 ### 4. Run the container
 
 #### Basic run (no persistent models)
 
-bash  
+```bash  
 docker run -d \  
   --name ollama-amd-rocm71 \  
   --device=/dev/kfd \  
@@ -78,10 +78,10 @@ docker run -d \
   -p 11434:11434 \  
   xxdoman/ollama-amd-rocm71 \  
   ollama serve  
-
+```
 #### Recommended run with persistent models on host
 
-bash  
+```bash  
 mkdir -p /opt/ollama-models  
 
 docker run -d \  
@@ -94,23 +94,23 @@ docker run -d \
   -v /opt/ollama-models:/root/.ollama \  
   xxdoman/ollama-amd-rocm71 \  
   ollama serve  
-
+```
 Ollama will listen on:  
 **http://localhost:11434**
 
 -------------------------------------------
 ### 5. Check logs and ROCm detection
 
-bash  
+```bash  
 docker logs -n 80 ollama-amd-rocm71  
-
+```
 You should see something like:
 
-text  
+```text  
 amdgpu is supported gpu_type=gfx906  
 inference compute id=GPU-... library=rocm compute=gfx906 total="32.0 GiB"  
 Listening on [::]:11434 (version 0.12.3)  
-
+```
 This means:
 * GPU detected
 * **library=rocm**
@@ -118,10 +118,10 @@ This means:
 
 If you see instead:
 
-text  
+```text  
 no suitable rocm found, falling back to CPU  
 inference compute ... library=cpu  
-
+```
 then the container is running on CPU, not GPU. Check:
 * ROCm installation on the host
 * Devices passed to the container: /dev/kfd and /dev/dri/renderD*
@@ -131,19 +131,19 @@ then the container is running on CPU, not GPU. Check:
 
 #### Inside the container
 
-bash  
+```bash  
 docker exec -it ollama-amd-rocm71 /bin/bash  
 
 ollama pull llama3.2:1b  
 ollama list  
 ollama run llama3.2:1b  
-
+```
 #### HTTP API test from host
 
-bash  
+```bash  
 curl http://localhost:11434/api/tags  
-
-bash  
+```
+```bash  
 curl -X POST http://localhost:11434/api/generate \  
   -H "Content-Type: application/json" \  
   -d '{  
@@ -151,12 +151,12 @@ curl -X POST http://localhost:11434/api/generate \
     "prompt": "Hello from MI50!",  
     "stream": false  
   }'  
-
+```
 While generating, you can check GPU usage on host:
 
-bash  
+```bash  
 /opt/rocm/bin/rocm-smi  
-
+```
 If MI50 VRAM and activity go up, inference is running on GPU.
 
 -------------------------------------------
@@ -168,9 +168,9 @@ The official Docker image:
 
 On MI50 this usually results in:
 
-text  
+```text  
 no compatible rocm library found ... falling back to CPU  
-
+```
 This image:
 * adds full ROCm 7.1 userspace inside the container,
 * configures Ollama to use ROCm backend (**library=rocm**),
@@ -207,26 +207,26 @@ This image:
 
 **Szybkie sprawdzenie:**
 
-bash  
+```bash  
 ls -l /dev/kfd  
 ls -l /dev/dri/renderD*  
 groups  
-
+```
 ### Budowanie lokalnie (opcjonalne)
 
-bash  
+```bash  
 git clone https://github.com/xxDoman/ollama-amd-mi50.git  
 cd ollama-amd-mi50  
 docker build -t ollama-amd-rocm71 .  
-
+```
 Albo pobranie z Docker Huba:
 
-bash  
+```bash  
 docker pull xxdoman/ollama-amd-rocm71:latest  
-
+```
 ### Uruchomienie z trwałą lokalizacją modeli
 
-bash  
+```bash  
 mkdir -p /opt/ollama-models  
 
 docker run -d \  
@@ -239,23 +239,24 @@ docker run -d \
   -v /opt/ollama-models:/root/.ollama \  
   xxdoman/ollama-amd-rocm71 \  
   ollama serve  
-
+```
 Ollama będzie dostępna pod adresem: **http://localhost:11434**
 
 ### Logi i GPU
 
-bash  
+```bash  
 docker logs -n 80 ollama-amd-rocm71  
-
+```
 Szukaj:
 
-text  
+```text  
 amdgpu is supported gpu_type=gfx906  
 library=rocm compute=gfx906  
-
+```
 Jeżeli jest **library=cpu** lub komunikat o braku ROCm, to liczy na CPU.
 
 **Monitorowanie GPU:**
 
-bash  
+```bash  
 /opt/rocm/bin/rocm-smi
+```
